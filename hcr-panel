@@ -501,6 +501,7 @@ main_menu(){
         echo -e "${C}[0] VOLVER${N}"
         echo
         read -r -p "Selecciona una opción: " option
+        # Las opciones 8 y 9 administran las unidades de cada puerto configurado.
         case "$option" in
             1) if installed; then if primary_service_installed; then change_port; else /usr/local/bin/hcr-ports; fi; else if confirm "¿Instalar HCR desde el repositorio?"; then install_hcr; fi; fi; pause ;;
             2) primary_service_installed && change_redirect_port || err "No hay servicio principal; administra los puertos desde la opción 1."; pause ;;
