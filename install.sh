@@ -148,6 +148,34 @@ EOF
 	chmod 0644 "$TEMP_UNIT"
 }
 
+install_management_tools() {
+	local tools_dir tool source
+	command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1 || fail "Se necesita curl o wget para descargar el panel SSH."
+	tools_dir="$(mktemp -d)"
+	for tool in hcr-panel hcr-ports; do
+		source="$tools_dir/$tool"
+		# Descargar siempre desde el repositorio para no depender de que el
+		# instalador se haya ejecutado desde una carpeta que contenga estos archivos.
+		if command -v curl >/dev/null 2>&1; then
+			curl -fsSL --retry 3 --retry-delay 2 "https://raw.githubusercontent.com/decodezsniff-art/HCR-Installer/main/$tool" -o "$source" || {
+				rm -rf "$tools_dir"; fail "No se pudo descargar $tool desde GitHub."
+			}
+		else
+			wget -q --tries=3 -O "$source" "https://raw.githubusercontent.com/decodezsniff-art/HCR-Installer/main/$tool" || {
+				rm -rf "$tools_dir"; fail "No se pudo descargar $tool desde GitHub."
+			}
+		fi
+		[ -s "$source" ] || { rm -rf "$tools_dir"; fail "GitHub entregó un archivo vacío: $tool."; }
+		bash -n "$source" || { rm -rf "$tools_dir"; fail "El archivo descargado $tool tiene errores de sintaxis."; }
+	done
+	install -m 0755 "$tools_dir/hcr-panel" /usr/local/bin/hcr-panel
+	install -m 0755 "$tools_dir/hcr-ports" /usr/local/bin/hcr-ports
+	rm -rf "$tools_dir"
+	command -v hcr-panel >/dev/null 2>&1 || fail "El panel no quedó instalado en el PATH."
+	[ -x /usr/local/bin/hcr-panel ] || fail "El panel no tiene permisos de ejecución."
+	[ -x /usr/local/bin/hcr-ports ] || fail "El gestor de puertos no quedó instalado."
+}
+
 install_service() {
 	[ -f "$SCRIPT_DIR/hcr-server" ] || fail "No se encontró hcr-server junto a install.sh."
 	install -d -m 0755 "$DIR"
@@ -168,9 +196,10 @@ install_service() {
 	systemctl restart hcr-server.service || fail "Start failed. Check journalctl -u hcr-server."
 	sleep 3
 	systemctl is-active --quiet hcr-server.service || fail "Service stopped. Check journalctl -u hcr-server."
+	install_management_tools
 	echo "HCR Server installed on port $PORT ($TRANSPORT)."
-	if [ -f "$SCRIPT_DIR/hcr-panel" ]; then install -m 0755 "$SCRIPT_DIR/hcr-panel" /usr/local/bin/hcr-panel; echo "Panel instalado: ejecuta hcr-panel"; fi
-	if [ -f "$SCRIPT_DIR/hcr-ports" ]; then install -m 0755 "$SCRIPT_DIR/hcr-ports" /usr/local/bin/hcr-ports; echo "Gestor de puertos instalado."; fi
+	echo "Panel SSH instalado correctamente. Ejecuta: hcr-panel"
+	echo "Gestor de puertos instalado correctamente."
 }
 
 uninstall_service() {
