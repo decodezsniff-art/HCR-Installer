@@ -169,23 +169,80 @@ change_redirect_port(){
     set_exec_arg -target "$host:$value"; write_exec
 }
 
-configure_frame_only(){
-    read_config || return 1
-    local value
-    echo "Max Download Frame actual: $FRAME"
-    read -r -p "Nuevo Max Download Frame (1-262140): " value
-    [[ "$value" =~ ^[0-9]{1,6}$ ]] && (( 10#$value >= 1 && 10#$value <= 262140 )) || { err "Valor inválido."; return 1; }
-    set_exec_arg -max-download-frame "$value"; write_exec
+configured_hcr_units(){
+    HCR_UNITS=()
+    local file port
+    primary_service_installed && HCR_UNITS+=("hcr-server.service")
+    shopt -s nullglob
+    for file in /etc/hcr-server/ports/*.conf; do
+        port="${file##*/}"; port="${port%.conf}"
+        HCR_UNITS+=("hcr-server-port-${port}.service")
+    done
+    shopt -u nullglob
 }
 
-configure_poll_only(){
-    read_config || return 1
-    local value
-    echo "Download Poll Timeout actual: $POLL"
-    read -r -p "Nuevo timeout (0, 500ms, 5s, 1m...): " value
-    valid_duration "$value" || { err "Duración inválida."; return 1; }
-    set_exec_arg -download-poll-timeout "$value"; write_exec
+apply_flag_to_unit(){
+    local unit="$1" flag="$2" value="$3"
+    local service="/etc/systemd/system/$unit" line tmp token replacement backup
+    [[ -r "$service" ]] || { err "No se puede leer $service"; return 1; }
+    line="$(sed -n 's/^ExecStart=//p' "$service" | tail -n1)"
+    [[ -n "$line" ]] || { err "No se encontró ExecStart en $unit"; return 1; }
+    read -r -a EXEC_ARGS <<< "$line"
+    [[ "${EXEC_ARGS[0]:-}" == "$BIN" ]] || { err "$unit no usa el binario HCR esperado; omitido."; return 1; }
+    set_exec_arg "$flag" "$value"
+    replacement=""
+    for token in "${EXEC_ARGS[@]}"; do
+        [[ "$token" =~ ^[a-zA-Z0-9_./:@+-]+$ ]] || { err "Argumento no admitido en $unit: $token"; return 1; }
+        replacement+=" $token"
+    done
+    replacement="ExecStart=${replacement# }"
+    tmp="$(mktemp "${service}.XXXXXX")"
+    if ! awk -v replacement="$replacement" '
+        /^ExecStart=/ { if (!done) { print replacement; done=1 }; next }
+        { print }
+        END { if (!done) exit 3 }
+    ' "$service" > "$tmp"; then rm -f "$tmp"; err "No se pudo preparar $unit"; return 1; fi
+    chmod --reference="$service" "$tmp"
+    backup="${service}.hcrcustom.bak.$(date +%Y%m%d%H%M%S)"
+    cp -a "$service" "$backup"
+    if ! cat "$tmp" > "$service"; then rm -f "$tmp"; err "No se pudo escribir $unit"; return 1; fi
+    rm -f "$tmp"
+    if ! systemctl daemon-reload || ! systemctl restart "$unit" || ! systemctl is-active --quiet "$unit"; then
+        err "$unit no aceptó el cambio; restaurando configuración anterior."
+        cp -a "$backup" "$service"
+        systemctl daemon-reload || true
+        systemctl restart "$unit" || true
+        return 1
+    fi
+    ok "$unit actualizado: $flag $value"
 }
+
+configure_all_download_option(){
+    local flag="$1" label="$2" value unit failed=0 total=0 current
+    configured_hcr_units
+    (("${#HCR_UNITS[@]}" > 0)) || { err "No hay puertos/servicios HCR configurados."; return 1; }
+    if [[ "$flag" == -max-download-frame ]]; then
+        current="16384"
+        if primary_service_installed; then read_config && current="$FRAME" || true; fi
+        echo "$label actual (principal): $current"
+        read -r -p "Nuevo valor (1-262140 bytes): " value
+        [[ "$value" =~ ^[0-9]{1,6}$ ]] && (( 10#$value >= 1 && 10#$value <= 262140 )) || { err "Valor inválido."; return 1; }
+    else
+        current="8s"
+        if primary_service_installed; then read_config && current="$POLL" || true; fi
+        echo "$label actual (principal): $current"
+        read -r -p "Nuevo timeout (0, 500ms, 5s, 1m...): " value
+        valid_duration "$value" || { err "Duración inválida."; return 1; }
+    fi
+    for unit in "${HCR_UNITS[@]}"; do
+        ((total+=1))
+        if ! apply_flag_to_unit "$unit" "$flag" "$value"; then ((failed+=1)); fi
+    done
+    if (( failed == 0 )); then ok "$label aplicado en los $total servicios HCR."; else err "$label aplicado con errores: $failed de $total servicios fallaron."; return 1; fi
+}
+
+configure_frame_only(){ configure_all_download_option -max-download-frame "MAX DOWNLOAD FRAME"; }
+configure_poll_only(){ configure_all_download_option -download-poll-timeout "DOWNLOAD POLL TIMEOUT"; }
 
 configure_transport(){
     read_config || return 1
@@ -499,23 +556,20 @@ main_menu(){
             echo -e "${C}===== PUERTOS CONFIGURADOS =====${N}"
             show_active_ports
             echo -e "${C}=================================${N}"
+            read_config 2>/dev/null || { FRAME="16384"; POLL="8s"; PORT="?"; TARGET="127.0.0.1:22"; TRANSPORT="plain"; }
+            state="$(overall_hcr_status)"
+            echo -e "Estado del servicio: ${G}$state${N}"
+            echo -e "${C}=================================${N}"
             if primary_service_installed; then
-                read_config || true
-                state="$(systemctl is-active hcr-server.service 2>/dev/null || true)"
-                [[ "$state" == active ]] && state="ACTIVO" || state="DETENIDO"
                 [[ "${TRANSPORT:-plain}" == plain ]] && tls="OFF" || tls="ON"
-                echo -e "Estado: ${G}$state${N}"
-                echo -e "${C}=================================${N}"
                 echo -e "${Y}[1]> PUERTO HCR: ${PORT:-?}${N}"
                 echo -e "${Y}[2]> PUERTO DE REDIRECCION: ${TARGET##*:}${N}"
-                echo -e "${Y}[3]> MAX DOWNLOAD FRAME: ${FRAME:-?}${N}"
-                echo -e "${Y}[4]> DOWNLOAD POLL TIMEOUT: ${POLL:-?}${N}"
                 echo -e "${Y}[5]> MODO SSL/TLS [${tls}]${N}"
             else
-                echo -e "Estado: ${G}HCR INSTALADO${N}"
-                echo -e "${C}=================================${N}"
                 echo -e "${Y}[1]> AGREGAR / ADMINISTRAR PUERTOS${N}"
             fi
+            echo -e "${Y}[3]> MAX DOWNLOAD FRAME: ${FRAME:-16384} (todos los puertos)${N}"
+            echo -e "${Y}[4]> DOWNLOAD POLL TIMEOUT: ${POLL:-8s} (todos los puertos)${N}"
         else
             echo -e "Estado: ${R}NO INSTALADO${N}"
             echo -e "${C}=================================${N}"
