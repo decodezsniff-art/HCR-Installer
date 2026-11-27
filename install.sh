@@ -214,20 +214,7 @@ uninstall_service() {
 	shopt -u nullglob
 	rm -f -- "$UNIT_LINK_PATH" "$UNIT_SOURCE_PATH"
 	rm -f -- /usr/local/bin/hcr-panel /usr/local/bin/hcr-ports
-	if [ -f /etc/sysctl.d/99-hcrcustom-bbr.conf ] && grep -q '^# HCRCUSTOM BBR FQ
-
-main() {
-	trap 'if [ -n "$TEMP_UNIT" ]; then rm -f -- "$TEMP_UNIT"; fi' EXIT
-	parse_args "$@"
-	if [ "$ACTION" = version ]; then "$BINARY_PATH" -version; return; fi
-	[ "$(uname -s)" = Linux ] && [ "$(id -u)" = 0 ] || fail "Run as root on Linux."
-	command -v systemctl >/dev/null || fail "systemd is required."
-	[[ "$SCRIPT_DIR" != *[[:space:]\"\'\\%\$]* ]] || fail "Use a folder without spaces or special characters."
-	if [ "$ACTION" = uninstall ]; then uninstall_service; else install_service; fi
-}
-
-if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then main "$@"; fi
- /etc/sysctl.d/99-hcrcustom-bbr.conf; then
+	if [ -f /etc/sysctl.d/99-hcrcustom-bbr.conf ] && grep -q '^# HCRCUSTOM BBR FQ' /etc/sysctl.d/99-hcrcustom-bbr.conf; then
 		rm -f -- /etc/sysctl.d/99-hcrcustom-bbr.conf
 	fi
 	rm -rf -- "$DIR" /etc/hcr-server /tmp/HCR-Installer
@@ -243,7 +230,7 @@ main() {
 	if [ "$ACTION" = version ]; then "$BINARY_PATH" -version; return; fi
 	[ "$(uname -s)" = Linux ] && [ "$(id -u)" = 0 ] || fail "Run as root on Linux."
 	command -v systemctl >/dev/null || fail "systemd is required."
-	[[ "$SCRIPT_DIR" != *[[:space:]\"\'\\%\$]* ]] || fail "Use a folder without spaces or special characters."
+	[[ "$SCRIPT_DIR" != *[[:space:]\"'\\%\$]* ]] || fail "Use a folder without spaces or special characters."
 	if [ "$ACTION" = uninstall ]; then uninstall_service; else install_service; fi
 }
 
