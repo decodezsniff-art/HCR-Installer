@@ -250,24 +250,59 @@ configure_stats(){
     set_exec_arg -session-stats-interval "$value"; write_exec
 }
 
-status_hcr(){ systemctl status hcr-server.service --no-pager -l || true; }
-logs_hcr(){ journalctl -u hcr-server.service -n 100 --no-pager || true; }
+status_hcr(){
+    if primary_service_installed; then
+        systemctl status hcr-server.service --no-pager -l || true
+    else
+        info "No existe servicio principal; se están usando los servicios de puertos adicionales."
+    fi
+    echo
+    show_active_ports
+}
+logs_hcr(){
+    local service
+    if primary_service_installed; then
+        journalctl -u hcr-server.service -n 100 --no-pager || true
+    else
+        shopt -s nullglob
+        local files=(/etc/hcr-server/ports/*.conf)
+        shopt -u nullglob
+        if (("${#files[@]}" == 0)); then info "Todavía no hay registros de puertos."; return 0; fi
+        for file in "${files[@]}"; do
+            service="hcr-server-port-${file##*/}"
+            service="${service%.conf}.service"
+            echo "===== $service ====="
+            journalctl -u "$service" -n 40 --no-pager || true
+        done
+    fi
+}
 
 show_active_ports(){
-    local file port transport service count=0
-    if systemctl is-active --quiet hcr-server.service; then
-        read_config || true
-        printf "  ${G}●${N} Principal: puerto %-5s | destino %-18s | transporte %s\n" "${PORT:-?}" "${TARGET:-?}" "${TRANSPORT:-?}"
-        ((count+=1))
-    else echo -e "  ${R}● HCR principal detenido${N}"; fi
+    local file port transport service count=0 configured=0
+    if primary_service_installed; then
+        if systemctl is-active --quiet hcr-server.service; then
+            read_config || true
+            printf "  ${G}●${N} Principal: puerto %-5s | destino %-18s | transporte %s\n" "${PORT:-?}" "${TARGET:-?}" "${TRANSPORT:-?}"
+            ((count+=1))
+        else
+            echo -e "  ${R}● HCR principal detenido${N}"
+        fi
+        ((configured+=1))
+    fi
     shopt -s nullglob
     for file in /etc/hcr-server/ports/*.conf; do
         port="${file##*/}"; port="${port%.conf}"; service="hcr-server-port-${port}.service"
         transport="$(sed -n 's/^TRANSPORT=//p' "$file" | head -n1)"; transport="${transport:-desconocido}"
-        if systemctl is-active --quiet "$service"; then printf "  ${G}●${N} Multiport %-5s | %s | ACTIVO\n" "$port" "$transport"; ((count+=1)); else printf "  ${R}●${N} Multiport %-5s | %s | DETENIDO\n" "$port" "$transport"; fi
+        ((configured+=1))
+        if systemctl is-active --quiet "$service"; then
+            printf "  ${G}●${N} Puerto %-5s | %s | ACTIVO\n" "$port" "$transport"
+            ((count+=1))
+        else
+            printf "  ${R}●${N} Puerto %-5s | %s | DETENIDO\n" "$port" "$transport"
+        fi
     done
     shopt -u nullglob
-    (( count > 0 )) || info "No hay puertos activos."
+    if (( configured == 0 )); then info "No hay puertos configurados."; else info "Puertos activos: $count de $configured."; fi
 }
 
 bbr_status(){
@@ -402,7 +437,8 @@ main_menu(){
                 printf '[4]> DOWNLOAD POLL TIMEOUT: %s\n' "${POLL:-?}"
                 printf '[5]> MODO SSL/TLS [%s]\n' "$tls"
             else
-                echo -e "Estado: ${G}INSTALADO (SIN PUERTO PRINCIPAL)${N}"
+                echo -e "Estado: ${G}HCR INSTALADO${N}"
+                show_active_ports
                 echo "[1]> AGREGAR / ADMINISTRAR PUERTOS"
             fi
         else
