@@ -402,7 +402,7 @@ main_menu(){
                 printf '[4]> DOWNLOAD POLL TIMEOUT: %s\n' "${POLL:-?}"
                 printf '[5]> MODO SSL/TLS [%s]\n' "$tls"
             else
-                echo -e "Estado: ${G}INSTALADO SIN PUERTOS${N}"
+                echo -e "Estado: ${G}INSTALADO (SIN PUERTO PRINCIPAL)${N}"
                 echo "[1]> AGREGAR / ADMINISTRAR PUERTOS"
             fi
         else
