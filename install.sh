@@ -230,7 +230,7 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then main "$@"; fi
  /etc/sysctl.d/99-hcrcustom-bbr.conf; then
 		rm -f -- /etc/sysctl.d/99-hcrcustom-bbr.conf
 	fi
-	rm -rf -- "$DIR" /etc/hcr-server
+	rm -rf -- "$DIR" /etc/hcr-server /tmp/HCR-Installer
 	systemctl daemon-reload
 	systemctl reset-failed hcr-server.service >/dev/null 2>&1 || true
 	echo "HCR desinstalado completamente: servicios, binario, datos, panel y gestor de puertos eliminados."
