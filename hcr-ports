@@ -24,10 +24,11 @@ add_port(){
   if ss -H -ltn | awk -v p=":$p" '$4 ~ (p "$"){f=1} END{exit !f}'; then echo "El puerto está ocupado."; return 1; fi
   read -r -p "Destino SSH [127.0.0.1:22]: " target; target="${target:-127.0.0.1:22}"
   [[ "$target" =~ ^[a-zA-Z0-9_.-]+:[0-9]{1,5}$ ]] || { echo "Destino inválido."; return 1; }
+  local dest_port="${target##*:}"; (( 10#$dest_port >= 1 && 10#$dest_port <= 65535 )) || { echo "Puerto de destino fuera de rango."; return 1; }
   read -r -p "Transporte plain/tls [plain]: " transport; transport="${transport:-plain}"
   case "$transport" in
     plain) ;;
-    tls) read -r -p "Ruta del certificado: " cert; read -r -p "Ruta de la clave privada: " key; [[ -r "$cert" && -r "$key" ]] || { echo "No se pueden leer los archivos TLS."; return 1; } ;;
+    tls) read -r -p "Ruta del certificado: " cert; read -r -p "Ruta de la clave privada: " key; [[ "$cert" =~ ^[a-zA-Z0-9_./-]+$ && "$key" =~ ^[a-zA-Z0-9_./-]+$ && -r "$cert" && -r "$key" ]] || { echo "Rutas TLS inválidas o archivos no legibles."; return 1; } ;;
     *) echo "Transporte inválido."; return 1 ;;
   esac
   install -d -m 0750 "$CONF"
