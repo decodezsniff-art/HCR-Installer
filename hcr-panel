@@ -348,7 +348,7 @@ more_options_menu(){
             4) logs_hcr; pause ;;
             5) if [[ -x /usr/local/bin/hcr-ports ]]; then /usr/local/bin/hcr-ports; else err "No se encontró /usr/local/bin/hcr-ports."; fi; pause ;;
             6) if confirm "La actualización puede reemplazar el binario HCR. ¿Continuar?"; then download_run update.sh || err "La actualización falló."; fi; pause ;;
-            7) if confirm "¿Ejecutar el instalador del repositorio?"; then download_run install.sh || err "La instalación falló."; fi; pause ;;
+            7) if confirm "¿Ejecutar el instalador del repositorio?"; then install_hcr || err "La instalación falló."; fi; pause ;;
             0) return ;;
             *) warn "Opción inválida."; sleep 1 ;;
         esac
