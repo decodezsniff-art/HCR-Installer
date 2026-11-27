@@ -391,12 +391,55 @@ more_options_menu(){
     done
 }
 
+get_hcr_units(){
+    HCR_UNITS=()
+    local file port
+    if primary_service_installed; then HCR_UNITS+=("hcr-server.service"); fi
+    shopt -s nullglob
+    for file in /etc/hcr-server/ports/*.conf; do
+        port="${file##*/}"; port="${port%.conf}"
+        HCR_UNITS+=("hcr-server-port-${port}.service")
+    done
+    shopt -u nullglob
+}
+
+restart_hcr_services(){
+    local unit found=0 failed=0
+    get_hcr_units
+    if (("${#HCR_UNITS[@]}" == 0)); then err "No hay servicios HCR configurados."; return 1; fi
+    if ! confirm "¿Reiniciar todos los servicios HCR configurados?"; then return 0; fi
+    for unit in "${HCR_UNITS[@]}"; do
+        found=1
+        if systemctl restart "$unit"; then ok "$unit reiniciado."; else err "No se pudo reiniciar $unit."; ((failed+=1)); fi
+    done
+    (( failed == 0 )) && ok "Todos los servicios HCR fueron reiniciados." || err "Fallaron $failed servicio(s)."
+    (( failed == 0 ))
+}
+
 service_toggle(){
-    if systemctl is-active --quiet hcr-server.service; then
-        if confirm "HCR está activo. ¿Detenerlo?"; then systemctl stop hcr-server.service && ok "Servicio detenido."; fi
+    local unit active=0 failed=0 action
+    get_hcr_units
+    if (("${#HCR_UNITS[@]}" == 0)); then err "No hay servicios HCR configurados."; return 1; fi
+    for unit in "${HCR_UNITS[@]}"; do
+        systemctl is-active --quiet "$unit" && ((active+=1)) || true
+    done
+    if (( active > 0 )); then
+        action="stop"
+        confirm "Hay $active servicio(s) HCR activo(s). ¿Detener todos los servicios configurados?" || return 0
     else
-        if confirm "HCR está detenido. ¿Iniciarlo?"; then systemctl start hcr-server.service && ok "Servicio iniciado."; fi
+        action="start"
+        confirm "No hay servicios HCR activos. ¿Iniciar todos los servicios configurados?" || return 0
     fi
+    for unit in "${HCR_UNITS[@]}"; do
+        if systemctl "$action" "$unit"; then
+            if [[ "$action" == stop ]]; then ok "$unit detenido."; else ok "$unit iniciado."; fi
+        else
+            err "No se pudo $([[ "$action" == stop ]] && echo detener || echo iniciar) $unit."
+            ((failed+=1))
+        fi
+    done
+    (( failed == 0 )) && ok "Operación completada." || err "Fallaron $failed servicio(s)."
+    (( failed == 0 ))
 }
 
 uninstall_hcr(){
@@ -467,8 +510,8 @@ main_menu(){
             5) primary_service_installed && configure_transport || err "No hay servicio principal; administra los puertos desde la opción 1."; pause ;;
             6) bbr_menu ;;
             7) status_hcr; pause ;;
-            8) if primary_service_installed && confirm "¿Reiniciar HCR ahora?"; then systemctl restart hcr-server.service && ok "Servicio reiniciado." || err "No se pudo reiniciar."; else err "No hay servicio principal que reiniciar."; fi; pause ;;
-            9) primary_service_installed && service_toggle || err "No hay servicio principal; administra los puertos desde la opción 1."; pause ;;
+            8) restart_hcr_services; pause ;;
+            9) service_toggle; pause ;;
             10) installed && uninstall_hcr || err "HCR no está instalado."; pause ;;
             11) more_options_menu ;;
             0) clear; exit 0 ;;
