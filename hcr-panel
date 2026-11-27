@@ -352,7 +352,7 @@ bbr_menu(){
     local option
     while true; do
         clear; echo -e "${C}===== HIGH PERFORMANCE (BBR + FQ) =====${N}"
-        bbr_status; echo; echo "[1] Activar BBR + FQ"; echo "[2] Desactivar BBR + FQ"; echo "[3] Consultar estado"; echo "[0] Volver"
+        bbr_status; echo; echo -e "${Y}[1] Activar BBR + FQ${N}"; echo -e "${R}[2] Desactivar BBR + FQ${N}"; echo -e "${Y}[3] Consultar estado${N}"; echo -e "${C}[0] Volver${N}"
         read -r -p "Selecciona: " option
         case "$option" in
             1) confirm "¿Activar BBR + FQ?" && bbr_enable; pause ;;
@@ -368,14 +368,14 @@ more_options_menu(){
     local option
     while true; do
         clear; echo -e "${C}===== MÁS OPCIONES =====${N}"
-        echo "[1] Límites de conexiones y sesiones"
-        echo "[2] Diagnostics Interval"
-        echo "[3] Session Stats Interval"
-        echo "[4] Ver registros"
-        echo "[5] Administrar múltiples puertos"
-        echo "[6] Actualizar binario HCR"
-        echo "[7] Instalar HCR"
-        echo "[0] Volver"
+        echo -e "${Y}[1] Límites de conexiones y sesiones${N}"
+        echo -e "${Y}[2] Diagnostics Interval${N}"
+        echo -e "${Y}[3] Session Stats Interval${N}"
+        echo -e "${Y}[4] Ver registros${N}"
+        echo -e "${Y}[5] Administrar múltiples puertos${N}"
+        echo -e "${Y}[6] Actualizar binario HCR${N}"
+        echo -e "${Y}[7] Instalar HCR${N}"
+        echo -e "${C}[0] Volver${N}"
         read -r -p "Selecciona: " option
         case "$option" in
             1) primary_service_installed && configure_limits || err "No hay servicio principal. Agrega primero un puerto desde la opción 1."; pause ;;
@@ -425,6 +425,9 @@ main_menu(){
         echo "║             ADMINISTRADOR HCRCUSTOM          ║"
         echo -e "╚══════════════════════════════════════════════╝${N}"
         if installed; then
+            echo -e "${C}===== PUERTOS CONFIGURADOS =====${N}"
+            show_active_ports
+            echo
             if primary_service_installed; then
                 read_config || true
                 state="$(systemctl is-active hcr-server.service 2>/dev/null || true)"
@@ -438,22 +441,19 @@ main_menu(){
                 printf '[5]> MODO SSL/TLS [%s]\n' "$tls"
             else
                 echo -e "Estado: ${G}HCR INSTALADO${N}"
-                echo "[1]> AGREGAR / ADMINISTRAR PUERTOS"
+                echo -e "${Y}[1]> AGREGAR / ADMINISTRAR PUERTOS${N}"
             fi
-            echo
-            echo "===== PUERTOS CONFIGURADOS ====="
-            show_active_ports
         else
             echo -e "Estado: ${R}NO INSTALADO${N}"
-            echo "[1]> Instalar HCR Server"
+            echo -e "${Y}[1]> Instalar HCR Server${N}"
         fi
-        echo "[6]> HIGH PERFORMANCE (BBR + FQ) [consultar estado]"
-        echo "[7]> ESTADO DEL SERVICIO"
-        echo "[8]> REINICIAR SERVICIO"
-        echo "[9]> INICIAR/PARAR SERVICIO"
-        echo "[10]> DESINSTALAR"
-        echo "[11]> MÁS OPCIONES"
-        echo "[0] VOLVER"
+        echo -e "${Y}[6]> HIGH PERFORMANCE (BBR + FQ) [consultar estado]${N}"
+        echo -e "${Y}[7]> ESTADO DEL SERVICIO${N}"
+        echo -e "${Y}[8]> REINICIAR SERVICIO${N}"
+        echo -e "${Y}[9]> INICIAR/PARAR SERVICIO${N}"
+        echo -e "${R}[10]> DESINSTALAR${N}"
+        echo -e "${Y}[11]> MÁS OPCIONES${N}"
+        echo -e "${C}[0] VOLVER${N}"
         echo
         read -r -p "Selecciona una opción: " option
         case "$option" in
