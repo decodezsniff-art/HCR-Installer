@@ -337,7 +337,7 @@ more_options_menu(){
         echo "[3] Session Stats Interval"
         echo "[4] Ver registros"
         echo "[5] Administrar múltiples puertos"
-        echo "[6] Actualizar HCR (binario y archivos del proyecto)"
+        echo "[6] Actualizar binario HCR"
         echo "[7] Instalar HCR"
         echo "[0] Volver"
         read -r -p "Selecciona: " option
