@@ -204,9 +204,37 @@ install_service() {
 
 uninstall_service() {
 	systemctl disable --now hcr-server.service 2>/dev/null || true
-	rm -f -- "$UNIT_LINK_PATH"
+	shopt -s nullglob
+	local unit name
+	for unit in /etc/systemd/system/hcr-server-port-*.service; do
+		name="${unit##*/}"
+		systemctl disable --now "$name" 2>/dev/null || true
+		rm -f -- "$unit"
+	done
+	shopt -u nullglob
+	rm -f -- "$UNIT_LINK_PATH" "$UNIT_SOURCE_PATH"
+	rm -f -- /usr/local/bin/hcr-panel /usr/local/bin/hcr-ports
+	if [ -f /etc/sysctl.d/99-hcrcustom-bbr.conf ] && grep -q '^# HCRCUSTOM BBR FQ
+
+main() {
+	trap 'if [ -n "$TEMP_UNIT" ]; then rm -f -- "$TEMP_UNIT"; fi' EXIT
+	parse_args "$@"
+	if [ "$ACTION" = version ]; then "$BINARY_PATH" -version; return; fi
+	[ "$(uname -s)" = Linux ] && [ "$(id -u)" = 0 ] || fail "Run as root on Linux."
+	command -v systemctl >/dev/null || fail "systemd is required."
+	[[ "$SCRIPT_DIR" != *[[:space:]\"\'\\%\$]* ]] || fail "Use a folder without spaces or special characters."
+	if [ "$ACTION" = uninstall ]; then uninstall_service; else install_service; fi
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then main "$@"; fi
+ /etc/sysctl.d/99-hcrcustom-bbr.conf; then
+		rm -f -- /etc/sysctl.d/99-hcrcustom-bbr.conf
+	fi
+	rm -rf -- "$DIR" /etc/hcr-server
 	systemctl daemon-reload
-	echo "HCR Server uninstalled. Files kept in $SCRIPT_DIR"
+	systemctl reset-failed hcr-server.service >/dev/null 2>&1 || true
+	echo "HCR desinstalado completamente: servicios, binario, datos, panel y gestor de puertos eliminados."
+	echo "No se borraron certificados ni archivos ubicados fuera de las carpetas propias de HCR."
 }
 
 main() {
