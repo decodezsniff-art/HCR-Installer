@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+BIN=/opt/hcr-server/hcr-server
+CONF=/etc/hcr-server/ports
+UNIT=/etc/systemd/system
+(( EUID == 0 )) || { echo "Ejecuta como root."; exit 1; }
+valid_port(){ [[ "$1" =~ ^[0-9]{1,5}$ ]] && (( 10#$1 >= 1 && 10#$1 <= 65535 )); }
+list_ports(){
+  shopt -s nullglob
+  local f p
+  for f in "$CONF"/*.conf; do
+    p="${f##*/}"; p="${p%.conf}"
+    if systemctl is-active --quiet "hcr-server-port-${p}.service"; then echo "Puerto ${p}: ACTIVO"; else echo "Puerto ${p}: DETENIDO"; fi
+  done
+  shopt -u nullglob
+}
+add_port(){
+  local p target transport cert key unit
+  read -r -p "Puerto adicional: " p
+  valid_port "$p" || { echo "Puerto inválido."; return 1; }
+  [[ -x "$BIN" ]] || { echo "No se encontró $BIN. Instala HCR primero."; return 1; }
+  unit="$UNIT/hcr-server-port-${p}.service"
+  [[ ! -e "$unit" ]] || { echo "Ese puerto ya está configurado."; return 1; }
+  if ss -H -ltn | awk -v p=":$p" '$4 ~ (p "$"){f=1} END{exit !f}'; then echo "El puerto está ocupado."; return 1; fi
+  read -r -p "Destino SSH [127.0.0.1:22]: " target; target="${target:-127.0.0.1:22}"
+  [[ "$target" =~ ^[a-zA-Z0-9_.-]+:[0-9]{1,5}$ ]] || { echo "Destino inválido."; return 1; }
+  read -r -p "Transporte plain/tls [plain]: " transport; transport="${transport:-plain}"
+  case "$transport" in
+    plain) ;;
+    tls) read -r -p "Ruta del certificado: " cert; read -r -p "Ruta de la clave privada: " key; [[ -r "$cert" && -r "$key" ]] || { echo "No se pueden leer los archivos TLS."; return 1; } ;;
+    *) echo "Transporte inválido."; return 1 ;;
+  esac
+  install -d -m 0750 "$CONF"
+  {
+    echo "[Unit]"; echo "Description=HCR relay puerto $p"; echo "After=network.target"
+    echo "[Service]"; echo "WorkingDirectory=/opt/hcr-server"
+    if [[ "$transport" == tls ]]; then
+      printf "ExecStart=%s -listen :%s -target %s -transport tls -tls-cert %s -tls-key %s\n" "$BIN" "$p" "$target" "$cert" "$key"
+    else
+      printf "ExecStart=%s -listen :%s -target %s -transport plain\n" "$BIN" "$p" "$target"
+    fi
+    echo "Restart=on-failure"; echo "RestartSec=5s"; echo "[Install]"; echo "WantedBy=multi-user.target"
+  } > "$unit"
+  chmod 0644 "$unit"
+  printf "PORT=%s\nTRANSPORT=%s\nTARGET=%s\n" "$p" "$transport" "$target" > "$CONF/$p.conf"
+  systemctl daemon-reload
+  systemctl enable --now "hcr-server-port-${p}.service"
+  echo "Puerto $p agregado y servicio iniciado."
+}
+remove_port(){
+  local p
+  read -r -p "Puerto adicional que deseas eliminar: " p
+  valid_port "$p" || { echo "Puerto inválido."; return 1; }
+  systemctl disable --now "hcr-server-port-${p}.service" 2>/dev/null || true
+  rm -f "$UNIT/hcr-server-port-${p}.service" "$CONF/$p.conf"
+  systemctl daemon-reload
+  echo "Puerto $p eliminado."
+}
+install -d -m 0750 "$CONF"
+while true; do
+  echo; echo "===== ADMINISTRAR PUERTOS HCR ====="
+  echo "1) Ver puertos adicionales"; echo "2) Agregar puerto"; echo "3) Eliminar puerto"; echo "0) Volver"
+  read -r -p "Selecciona: " op
+  case "$op" in 1) list_ports ;; 2) add_port ;; 3) remove_port ;; 0) exit 0 ;; *) echo "Opción inválida." ;; esac
+done
