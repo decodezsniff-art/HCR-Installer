@@ -230,7 +230,7 @@ main() {
 	if [ "$ACTION" = version ]; then "$BINARY_PATH" -version; return; fi
 	[ "$(uname -s)" = Linux ] && [ "$(id -u)" = 0 ] || fail "Run as root on Linux."
 	command -v systemctl >/dev/null || fail "systemd is required."
-	[[ "$SCRIPT_DIR" != *[[:space:]\"'\\%\$]* ]] || fail "Use a folder without spaces or special characters."
+	case "$SCRIPT_DIR" in *[!a-zA-Z0-9_./-]*) fail "Use a folder without spaces or special characters." ;; esac
 	if [ "$ACTION" = uninstall ]; then uninstall_service; else install_service; fi
 }
 
