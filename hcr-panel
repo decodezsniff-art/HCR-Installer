@@ -21,7 +21,8 @@ pause(){ echo; read -r -p "Presiona ENTER para continuar..." _ || true; }
 root_check(){
     if (( EUID != 0 )); then err "Ejecuta como root."; exit 1; fi
 }
-installed(){ [[ -x "$BIN" ]] && systemctl cat hcr-server.service >/dev/null 2>&1; }
+installed(){ [[ -x "$BIN" ]]; }
+primary_service_installed(){ systemctl cat hcr-server.service >/dev/null 2>&1; }
 
 confirm(){
     local answer
@@ -342,9 +343,9 @@ more_options_menu(){
         echo "[0] Volver"
         read -r -p "Selecciona: " option
         case "$option" in
-            1) installed && configure_limits || err "No se pudo configurar límites."; pause ;;
-            2) installed && configure_diagnostics || err "No se pudo configurar diagnostics."; pause ;;
-            3) installed && configure_stats || err "No se pudo configurar estadísticas."; pause ;;
+            1) primary_service_installed && configure_limits || err "No hay servicio principal. Agrega primero un puerto desde la opción 1."; pause ;;
+            2) primary_service_installed && configure_diagnostics || err "No hay servicio principal. Agrega primero un puerto desde la opción 1."; pause ;;
+            3) primary_service_installed && configure_stats || err "No hay servicio principal. Agrega primero un puerto desde la opción 1."; pause ;;
             4) logs_hcr; pause ;;
             5) if [[ -x /usr/local/bin/hcr-ports ]]; then /usr/local/bin/hcr-ports; else err "No se encontró /usr/local/bin/hcr-ports."; fi; pause ;;
             6) if confirm "La actualización puede reemplazar el binario HCR. ¿Continuar?"; then download_run update.sh || err "La actualización falló."; fi; pause ;;
@@ -389,16 +390,21 @@ main_menu(){
         echo "║             ADMINISTRADOR HCRCUSTOM          ║"
         echo -e "╚══════════════════════════════════════════════╝${N}"
         if installed; then
-            read_config || true
-            state="$(systemctl is-active hcr-server.service 2>/dev/null || true)"
-            [[ "$state" == active ]] && state="ACTIVO" || state="DETENIDO"
-            [[ "${TRANSPORT:-plain}" == plain ]] && tls="OFF" || tls="ON"
-            echo -e "Estado: ${G}$state${N}"
-            printf '[1]> PUERTO HCR: %s\n' "${PORT:-?}"
-            printf '[2]> PUERTO DE REDIRECCION: %s\n' "${TARGET##*:}"
-            printf '[3]> MAX DOWNLOAD FRAME: %s\n' "${FRAME:-?}"
-            printf '[4]> DOWNLOAD POLL TIMEOUT: %s\n' "${POLL:-?}"
-            printf '[5]> MODO SSL/TLS [%s]\n' "$tls"
+            if primary_service_installed; then
+                read_config || true
+                state="$(systemctl is-active hcr-server.service 2>/dev/null || true)"
+                [[ "$state" == active ]] && state="ACTIVO" || state="DETENIDO"
+                [[ "${TRANSPORT:-plain}" == plain ]] && tls="OFF" || tls="ON"
+                echo -e "Estado: ${G}$state${N}"
+                printf '[1]> PUERTO HCR: %s\n' "${PORT:-?}"
+                printf '[2]> PUERTO DE REDIRECCION: %s\n' "${TARGET##*:}"
+                printf '[3]> MAX DOWNLOAD FRAME: %s\n' "${FRAME:-?}"
+                printf '[4]> DOWNLOAD POLL TIMEOUT: %s\n' "${POLL:-?}"
+                printf '[5]> MODO SSL/TLS [%s]\n' "$tls"
+            else
+                echo -e "Estado: ${G}INSTALADO SIN PUERTOS${N}"
+                echo "[1]> AGREGAR / ADMINISTRAR PUERTOS"
+            fi
         else
             echo -e "Estado: ${R}NO INSTALADO${N}"
             echo "[1]> Instalar HCR Server"
@@ -413,15 +419,15 @@ main_menu(){
         echo
         read -r -p "Selecciona una opción: " option
         case "$option" in
-            1) if installed; then change_port; else if confirm "¿Instalar HCR desde el repositorio?"; then install_hcr; fi; fi; pause ;;
-            2) installed && change_redirect_port || err "HCR no está instalado o no se pudo cambiar el destino."; pause ;;
-            3) installed && configure_frame_only || err "No se pudo configurar FRAME."; pause ;;
-            4) installed && configure_poll_only || err "No se pudo configurar Poll Timeout."; pause ;;
-            5) installed && configure_transport || err "No se pudo configurar TLS."; pause ;;
+            1) if installed; then if primary_service_installed; then change_port; else /usr/local/bin/hcr-ports; fi; else if confirm "¿Instalar HCR desde el repositorio?"; then install_hcr; fi; fi; pause ;;
+            2) primary_service_installed && change_redirect_port || err "No hay servicio principal; administra los puertos desde la opción 1."; pause ;;
+            3) primary_service_installed && configure_frame_only || err "No hay servicio principal; administra los puertos desde la opción 1."; pause ;;
+            4) primary_service_installed && configure_poll_only || err "No hay servicio principal; administra los puertos desde la opción 1."; pause ;;
+            5) primary_service_installed && configure_transport || err "No hay servicio principal; administra los puertos desde la opción 1."; pause ;;
             6) bbr_menu ;;
             7) status_hcr; pause ;;
-            8) if installed && confirm "¿Reiniciar HCR ahora?"; then systemctl restart hcr-server.service && ok "Servicio reiniciado." || err "No se pudo reiniciar."; fi; pause ;;
-            9) installed && service_toggle || err "HCR no está instalado."; pause ;;
+            8) if primary_service_installed && confirm "¿Reiniciar HCR ahora?"; then systemctl restart hcr-server.service && ok "Servicio reiniciado." || err "No se pudo reiniciar."; else err "No hay servicio principal que reiniciar."; fi; pause ;;
+            9) primary_service_installed && service_toggle || err "No hay servicio principal; administra los puertos desde la opción 1."; pause ;;
             10) installed && uninstall_hcr || err "HCR no está instalado."; pause ;;
             11) more_options_menu ;;
             0) clear; exit 0 ;;
