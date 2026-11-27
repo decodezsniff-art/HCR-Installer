@@ -2,14 +2,15 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-BINARY_PATH="$SCRIPT_DIR/hcr-server"
-UNIT_SOURCE_PATH="$SCRIPT_DIR/hcr-server.service"
+DIR="/opt/hcr-server"
+BINARY_PATH="$DIR/hcr-server"
+UNIT_SOURCE_PATH="$DIR/hcr-server.service"
 UNIT_LINK_PATH=/etc/systemd/system/hcr-server.service
 TLS_CERT_PATH=fullchain.pem
 TLS_KEY_PATH=privkey.pem
 ACTION=install
 PORT=8080
-TRANSPORT=auto
+TRANSPORT=plain
 TARGET=127.0.0.1:22
 SESSION_STATS_INTERVAL=0
 DIAGNOSTICS_INTERVAL=0
@@ -136,7 +137,7 @@ Description=HCR relay
 After=network.target
 
 [Service]
-WorkingDirectory=$SCRIPT_DIR
+WorkingDirectory=$DIR
 ExecStart=$BINARY_PATH $args
 Restart=on-failure
 RestartSec=5s
@@ -148,7 +149,9 @@ EOF
 }
 
 install_service() {
-	[ -f "$BINARY_PATH" ] && [ -x "$BINARY_PATH" ] || fail "Place an executable hcr-server in the same directory as install.sh."
+	[ -f "$SCRIPT_DIR/hcr-server" ] || fail "No se encontró hcr-server junto a install.sh."
+	install -d -m 0755 "$DIR"
+	install -m 0755 "$SCRIPT_DIR/hcr-server" "$BINARY_PATH"
 	validate_download_frame
 	if [[ "$TLS_CERT_PATH" != /* ]]; then TLS_CERT_PATH="$SCRIPT_DIR/${TLS_CERT_PATH#./}"; fi
 	if [[ "$TLS_KEY_PATH" != /* ]]; then TLS_KEY_PATH="$SCRIPT_DIR/${TLS_KEY_PATH#./}"; fi
@@ -166,10 +169,12 @@ install_service() {
 	sleep 3
 	systemctl is-active --quiet hcr-server.service || fail "Service stopped. Check journalctl -u hcr-server."
 	echo "HCR Server installed on port $PORT ($TRANSPORT)."
+	if [ -f "$SCRIPT_DIR/hcr-panel" ]; then install -m 0755 "$SCRIPT_DIR/hcr-panel" /usr/local/bin/hcr-panel; echo "Panel instalado: ejecuta hcr-panel"; fi
+	if [ -f "$SCRIPT_DIR/hcr-ports" ]; then install -m 0755 "$SCRIPT_DIR/hcr-ports" /usr/local/bin/hcr-ports; echo "Gestor de puertos instalado."; fi
 }
 
 uninstall_service() {
-	systemctl disable --now hcr-server.service
+	systemctl disable --now hcr-server.service 2>/dev/null || true
 	rm -f -- "$UNIT_LINK_PATH"
 	systemctl daemon-reload
 	echo "HCR Server uninstalled. Files kept in $SCRIPT_DIR"
