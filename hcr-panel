@@ -588,8 +588,8 @@ main_menu(){
         case "$option" in
             1) if installed; then if primary_service_installed; then change_port; else /usr/local/bin/hcr-ports; fi; else if confirm "¿Instalar HCR desde el repositorio?"; then install_hcr; fi; fi; pause ;;
             2) primary_service_installed && change_redirect_port || err "No hay servicio principal; administra los puertos desde la opción 1."; pause ;;
-            3) primary_service_installed && configure_frame_only || err "No hay servicio principal; administra los puertos desde la opción 1."; pause ;;
-            4) primary_service_installed && configure_poll_only || err "No hay servicio principal; administra los puertos desde la opción 1."; pause ;;
+            3) configure_frame_only; pause ;;
+            4) configure_poll_only; pause ;;
             5) primary_service_installed && configure_transport || err "No hay servicio principal; administra los puertos desde la opción 1."; pause ;;
             6) bbr_menu ;;
             7) status_hcr; pause ;;
