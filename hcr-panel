@@ -427,24 +427,27 @@ main_menu(){
         if installed; then
             echo -e "${C}===== PUERTOS CONFIGURADOS =====${N}"
             show_active_ports
-            echo
+            echo -e "${C}=================================${N}"
             if primary_service_installed; then
                 read_config || true
                 state="$(systemctl is-active hcr-server.service 2>/dev/null || true)"
                 [[ "$state" == active ]] && state="ACTIVO" || state="DETENIDO"
                 [[ "${TRANSPORT:-plain}" == plain ]] && tls="OFF" || tls="ON"
                 echo -e "Estado: ${G}$state${N}"
-                printf '[1]> PUERTO HCR: %s\n' "${PORT:-?}"
-                printf '[2]> PUERTO DE REDIRECCION: %s\n' "${TARGET##*:}"
-                printf '[3]> MAX DOWNLOAD FRAME: %s\n' "${FRAME:-?}"
-                printf '[4]> DOWNLOAD POLL TIMEOUT: %s\n' "${POLL:-?}"
-                printf '[5]> MODO SSL/TLS [%s]\n' "$tls"
+                echo -e "${C}=================================${N}"
+                echo -e "${Y}[1]> PUERTO HCR: ${PORT:-?}${N}"
+                echo -e "${Y}[2]> PUERTO DE REDIRECCION: ${TARGET##*:}${N}"
+                echo -e "${Y}[3]> MAX DOWNLOAD FRAME: ${FRAME:-?}${N}"
+                echo -e "${Y}[4]> DOWNLOAD POLL TIMEOUT: ${POLL:-?}${N}"
+                echo -e "${Y}[5]> MODO SSL/TLS [${tls}]${N}"
             else
                 echo -e "Estado: ${G}HCR INSTALADO${N}"
+                echo -e "${C}=================================${N}"
                 echo -e "${Y}[1]> AGREGAR / ADMINISTRAR PUERTOS${N}"
             fi
         else
             echo -e "Estado: ${R}NO INSTALADO${N}"
+            echo -e "${C}=================================${N}"
             echo -e "${Y}[1]> Instalar HCR Server${N}"
         fi
         echo -e "${Y}[6]> HIGH PERFORMANCE (BBR + FQ) [consultar estado]${N}"
