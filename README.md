@@ -1,52 +1,73 @@
-HCR Installer
 
-Instalador oficial de HCR Server para sistemas Linux.
+# HCR Installer
 
-Archivos
+Instalador y administrador de HCR Server para Linux.
 
-- "install.sh": script de instalación y administración.
-- "hcr-server": ejecutable del servidor HCR.
+## Archivos
 
-Requisitos
+- `install.sh`: instalación y configuración del servicio.
+- `hcr-server`: ejecutable del servidor.
+- `update.sh`: actualización del instalador y del servidor.
+- `uninstall.sh`: desinstalación del servicio.
 
-- Servidor Linux.
+## Requisitos
+
+- Sistema Linux.
 - Acceso root.
 - systemd.
-- Certificados TLS para los modos "auto" y "tls".
 
-Instalación
+## Instalación
 
-Descarga los archivos y ejecuta el instalador:
+Descarga los archivos:
 
+```bash
 mkdir -p /root/HCR-Installer
 cd /root/HCR-Installer
 
 wget -O install.sh https://raw.githubusercontent.com/decodezsniff-art/HCR-Installer/main/install.sh
 wget -O hcr-server https://raw.githubusercontent.com/decodezsniff-art/HCR-Installer/main/hcr-server
+wget -O update.sh https://raw.githubusercontent.com/decodezsniff-art/HCR-Installer/main/update.sh
+wget -O uninstall.sh https://raw.githubusercontent.com/decodezsniff-art/HCR-Installer/main/uninstall.sh
 
-chmod +x install.sh hcr-server
-./install.sh
+chmod +x install.sh hcr-server update.sh uninstall.sh
+```
 
-Servicio
+Para instalar sin certificados TLS:
+
+```bash
+./install.sh --transport plain
+```
+
+Los modos `auto` y `tls` requieren certificados TLS.
+
+## Servicio
 
 Consultar estado:
 
+```bash
 systemctl status hcr-server
+```
 
 Ver registros:
 
+```bash
 journalctl -u hcr-server -f
+```
 
-Desinstalación
+## Actualización
 
-El instalador admite:
+```bash
+./update.sh
+```
 
-./install.sh --uninstall
+## Desinstalación
 
-Autor
+```bash
+./uninstall.sh
+```
 
-GitHub: https://github.com/decodezsniff-art
+La desinstalación conserva los archivos del instalador y del servidor.
 
-Proyecto
+## Proyecto
 
-HCR-Installer
+GitHub: https://github.com/decodezsniff-art/HCR-Installer
