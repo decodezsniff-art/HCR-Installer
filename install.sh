@@ -181,25 +181,22 @@ install_service() {
 	install -d -m 0755 "$DIR"
 	install -m 0755 "$SCRIPT_DIR/hcr-server" "$BINARY_PATH"
 	validate_download_frame
-	if [[ "$TLS_CERT_PATH" != /* ]]; then TLS_CERT_PATH="$SCRIPT_DIR/${TLS_CERT_PATH#./}"; fi
-	if [[ "$TLS_KEY_PATH" != /* ]]; then TLS_KEY_PATH="$SCRIPT_DIR/${TLS_KEY_PATH#./}"; fi
-	if [ "$TRANSPORT" != plain ]; then
-		[ -f "$TLS_CERT_PATH" ] && [ -f "$TLS_KEY_PATH" ] || fail "TLS files are missing."
+
+	# La instalación inicial no abre puertos. Si existe el servicio principal
+	# creado por este instalador, se detiene y retira para dejar HCR sin listeners.
+	if [ -L "$UNIT_LINK_PATH" ] && [ "$(readlink -f "$UNIT_LINK_PATH")" = "$UNIT_SOURCE_PATH" ]; then
+		systemctl disable --now hcr-server.service 2>/dev/null || true
+		rm -f -- "$UNIT_LINK_PATH" "$UNIT_SOURCE_PATH"
+		systemctl daemon-reload
+		systemctl reset-failed hcr-server.service >/dev/null 2>&1 || true
 	fi
-	render_unit
-	mv -fT -- "$TEMP_UNIT" "$UNIT_SOURCE_PATH"
-	TEMP_UNIT=""
-	ln -sfnT -- "$UNIT_SOURCE_PATH" "$UNIT_LINK_PATH"
-	systemctl daemon-reload
-	systemctl enable hcr-server.service
-	systemctl reset-failed hcr-server.service >/dev/null 2>&1 || true
-	systemctl restart hcr-server.service || fail "Start failed. Check journalctl -u hcr-server."
-	sleep 3
-	systemctl is-active --quiet hcr-server.service || fail "Service stopped. Check journalctl -u hcr-server."
+
+	# El panel y el gestor se instalan aunque todavía no haya ningún puerto.
 	install_management_tools
-	echo "HCR Server installed on port $PORT ($TRANSPORT)."
-	echo "Panel SSH instalado correctamente. Ejecuta: hcr-panel"
-	echo "Gestor de puertos instalado correctamente."
+	install -d -m 0750 /etc/hcr-server/ports
+	echo "HCR Server instalado correctamente, sin puertos abiertos."
+	echo "Para agregar puertos, ejecuta: hcr-panel"
+	echo "Panel SSH y gestor de puertos instalados correctamente."
 }
 
 uninstall_service() {
