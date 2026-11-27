@@ -36,7 +36,7 @@ HCR Server
   ./install.sh --version
 
   --port NUMBER                 Port (8080)
-  --transport auto|tls|plain     Transport (auto)
+  --transport plain|tls|auto     Transport (plain)
   --target HOST:PORT            SSH server (127.0.0.1:22)
   --tls-cert FILE               Certificate (fullchain.pem)
   --tls-key FILE                Private key (privkey.pem)
