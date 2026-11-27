@@ -376,7 +376,7 @@ install_hcr(){
     fi
     chmod 0755 "$tmp/install.sh" "$tmp/hcr-server"
     bash -n "$tmp/install.sh" || { rm -rf "$tmp"; err "Instalador inválido."; return 1; }
-    (cd "$tmp" && bash ./install.sh); rc=$?
+    if (cd "$tmp" && bash ./install.sh); then rc=0; else rc=$?; fi
     rm -rf "$tmp"
     return "$rc"
 }
@@ -424,7 +424,7 @@ main_menu(){
             9) installed && service_toggle || err "HCR no está instalado."; pause ;;
             10) installed && uninstall_hcr || err "HCR no está instalado."; pause ;;
             11) more_options_menu ;;
-            0) clear; continue ;;
+            0) clear; exit 0 ;;
             *) warn "Opción inválida."; sleep 1 ;;
         esac
     done
