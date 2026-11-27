@@ -33,6 +33,8 @@ fi
 # Eliminar binario, configuraciones, datos y archivos descargados propios de HCR.
 rm -rf -- /opt/hcr-server
 rm -rf -- /etc/hcr-server
+# Limpiar también el clon temporal usado en las instrucciones de instalación.
+rm -rf -- /tmp/HCR-Installer
 
 systemctl daemon-reload
 systemctl reset-failed hcr-server.service 2>/dev/null || true
